@@ -1,0 +1,213 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[2]:
+
+
+############Import LIB###############
+import PySimpleGUI as sg
+import time
+import geopandas as gpd
+import pandas as pd
+import warnings
+warnings.simplefilter(action='ignore', category=UserWarning)
+
+
+
+#################################
+###########define Theme and Layout####################
+
+
+
+sg.theme("DarkTeal2")
+layout = [[sg.Text('Source file path :',font=('Arial' ,11)),
+sg.Input(size= (50,1),key=('input_source') ,change_submits=True),
+sg.FileBrowse(file_types=(('Shape File', '*.shp'),))],
+[sg.Text('Dump file path :',font=('Arial' ,11)),
+sg.Input(size= (50,1),key='input_dump' ,change_submits=True),
+sg.FileBrowse(file_types=(('Shape File', '*.shp'),))],
+[sg.Text('Output folder path :',font=('Arial' ,11)),
+sg.Input(size= (50,1),key='output_folder' ,change_submits=True),
+sg.FolderBrowse(key='output_folder_br')],
+[sg.Radio('Attribute', 'RADIO1',default=False,key= 'att'),sg.Radio('Geometry', 'RADIO1',default=False,key= 'geo'),
+sg.Radio('Attr+Geo', 'RADIO1',default=False,key= 'att_geo')],
+#sg.Button("Geometry",key= 'geo', button_color=("white","green"), size=(8, 1)),
+#sg.Button("Attri+Geo",key= 'att_geo',button_color=("white", "red"),size=(10, 1))],
+
+[sg.Button('Submit',disabled=True,key= 'BTN_SUBMIT',button_color=('orange'),font=('Arial' ,10 , 'bold')),
+sg.Button('Reset',key=('_BTN_CLEAR_'),button_color=('red'),font=('Arial' ,10 , 'bold')),sg.Button('Exit',button_color=('blue'),font=('Arial' ,10 , 'bold'))],
+[sg.ProgressBar(max_value=10, orientation='h', size=(20, 20), key='_progress_',visible = False , bar_color= ('orange' ,'green')),
+sg.Text(size= (4,1), key =('_percent_'))]]
+
+#########################################################################
+window = sg.Window('Quality check tool Ver.1.0', layout, size=(700,250)
+,finalize=True,enable_close_attempted_event=True)
+##############################################################################
+while True:
+event, values = window.read()
+if (event == sg.WINDOW_CLOSE_ATTEMPTED_EVENT or event == 'Exit') and sg.popup_yes_no('Do you really want to exit?') == 'Yes':
+#mem_clear_df_all()
+break
+######################
+
+
+
+###########################################################################
+if values["input_source"] != '' and values["input_dump"] !='' and values["output_folder"] !='' :
+window.FindElement('BTN_SUBMIT').Update(disabled=False)
+#################################################################
+if event == 'BTN_SUBMIT' and values["geo"]== True:
+print ('geo')
+start_time = time.time()
+window.FindElement('BTN_SUBMIT').Update(disabled=True)
+window.FindElement('_progress_').update(visible=True,current_count=0)
+progress_bar = window['_progress_']
+percent =window['_percent_']
+source=(values["input_source"])
+mds=(values["input_dump"])
+output_folder1=(values["output_folder"])
+gdf_mds=gpd.read_file(mds)
+progress_bar.update_bar(2)
+percent.update("10%")
+projection=gdf_mds.crs
+gdf_source=gpd.read_file(source)
+progress_bar.update_bar(4)
+percent.update("30%")
+aa=gdf_source.buffer(0.001)
+aa1=pd.DataFrame(aa)
+progress_bar.update_bar(6)
+percent.update("50%")
+aa1.rename(columns={0: 'Geometry'},inplace=True,errors='raise')
+aa2 = gpd.GeoDataFrame(aa1, geometry='Geometry', crs=(projection))
+gdf_source.simplify(0)
+gdf_mds.simplify(2)
+progress_bar.update_bar(7)
+percent.update("70%")
+gdf3 =gdf_source.overlay(gdf_mds, how='symmetric_difference',keep_geom_type=True)
+progress_bar.update_bar(9)
+percent.update("90%")
+wt_file = (output_folder1) + "/" + 'diff.shp'
+empty_no = gdf3.empty
+if empty_no == False:
+gdf3.to_file(wt_file)
+progress_bar.update_bar(10)
+percent.update("100%")
+sg.Popup('Sucessfully completed...check output_folder')
+if event == 'BTN_SUBMIT' and values['att']== True:
+print ('attri')
+start_time = time.time()
+window.FindElement('BTN_SUBMIT').Update(disabled=True)
+window.FindElement('_progress_').update(visible=True,current_count=0)
+progress_bar = window['_progress_']
+percent =window['_percent_']
+source=(values["input_source"])
+mds=(values["input_dump"])
+output_folder1=(values["output_folder"])
+gdf_mds=gpd.read_file(mds)
+progress_bar.update_bar(1)
+percent.update("30%")
+projection=gdf_mds.crs
+gdf_source=gpd.read_file(source)
+gdf_source1 = gdf_source[['New_Name']]
+gdf_mds1 = gdf_mds[['StandardNa']]
+progress_bar.update_bar(4)
+percent.update("60%")
+gdf_mds2=gdf_mds1.rename(columns={'StandardNa': 'New_Name'})
+df_not_match=gdf_source1.merge(gdf_mds2,how='left',indicator=True).loc[lambda x:x['_merge']!='both']
+progress_bar.update_bar(7)
+percent.update("90%")
+empty_no = df_not_match.empty
+if empty_no == False:
+wt_file1 = (output_folder1) +"/" + 'not_match.csv'
+df_not_match.to_csv(wt_file1,index=False)
+print(df_not_match)
+progress_bar.update_bar(10)
+percent.update("100%")
+sg.Popup('Sucessfully completed...check output_folder')
+
+
+
+if event == 'BTN_SUBMIT' and values["att_geo"]== True:
+window.FindElement('BTN_SUBMIT').Update(disabled=True)
+window.FindElement('_progress_').update(visible=True,current_count=0)
+progress_bar = window['_progress_']
+percent =window['_percent_']
+source=(values["input_source"])
+mds=(values["input_dump"])
+output_folder1=(values["output_folder"])
+gdf_mds=gpd.read_file(mds)
+progress_bar.update_bar(1)
+percent.update("10%")
+projection=gdf_mds.crs
+gdf_source=gpd.read_file(source)
+progress_bar.update_bar(2)
+percent.update("20%")
+aa=gdf_source.buffer(0.001)
+aa1=pd.DataFrame(aa)
+progress_bar.update_bar(3)
+percent.update("30%")
+aa1.rename(columns={0: 'Geometry'},inplace=True,errors='raise')
+aa2 = gpd.GeoDataFrame(aa1, geometry='Geometry', crs=(projection))
+gdf_source.simplify(0)
+gdf_mds.simplify(2)
+progress_bar.update_bar(4)
+percent.update("40%")
+gdf3 =gdf_source.overlay(gdf_mds, how='symmetric_difference',keep_geom_type=True)
+progress_bar.update_bar(5)
+percent.update("50%")
+wt_file = (output_folder1) + "/" + 'diff.shp'
+empty_no = gdf3.empty
+if empty_no == False:
+gdf3.to_file(wt_file)
+progress_bar.update_bar(6)
+percent.update("60%")
+source=(values["input_source"])
+mds=(values["input_dump"])
+output_folder1=(values["output_folder"])
+gdf_mds=gpd.read_file(mds)
+progress_bar.update_bar(7)
+percent.update("70%")
+projection=gdf_mds.crs
+gdf_source=gpd.read_file(source)
+gdf_source1 = gdf_source[['New_Name']]
+gdf_mds1 = gdf_mds[['StandardNa']]
+progress_bar.update_bar(8)
+percent.update("80%")
+gdf_mds2=gdf_mds1.rename(columns={'StandardNa': 'New_Name'})
+df_not_match=gdf_source1.merge(gdf_mds2,how='left',indicator=True).loc[lambda x:x['_merge']!='both']
+progress_bar.update_bar(9)
+percent.update("90%")
+empty_no = df_not_match.empty
+if empty_no == False:
+wt_file1 = (output_folder1) + "/" + 'not_match.csv'
+df_not_match.to_csv(wt_file1,index=False)
+print(df_not_match)
+progress_bar.update_bar(10)
+percent.update("100%")
+sg.Popup('Sucessfully completed...check output_folder')
+elif event == '_BTN_CLEAR_':
+window.FindElement('BTN_SUBMIT').Update(disabled=True)
+window.FindElement('input_source').Update('')
+window.FindElement('input_dump').Update('')
+window.FindElement('output_folder').Update('')
+window.FindElement('_progress_').update(visible=False,current_count=0)
+window.FindElement('_percent_').update('')
+window.close()
+
+
+# In[2]:
+
+
+import PySimpleGUI as sg
+import time
+import geopandas as gpd
+import pandas as pd
+import warnings
+warnings.simplefilter(action='ignore', category=UserWarning)
+
+
+# In[ ]:
+
+
+
+
